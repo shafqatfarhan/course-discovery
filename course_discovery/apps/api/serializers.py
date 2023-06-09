@@ -33,6 +33,7 @@ from course_discovery.apps.api.fields import (
 from course_discovery.apps.api.utils import StudioAPI
 from course_discovery.apps.catalogs.models import Catalog
 from course_discovery.apps.core.api_client.lms import LMSAPIClient
+from course_discovery.apps.core.utils import update_instance
 from course_discovery.apps.course_metadata.choices import CourseRunStatus, ProgramStatus
 from course_discovery.apps.course_metadata.fields import HtmlField as MetadataHtmlField
 from course_discovery.apps.course_metadata.models import (
@@ -1410,12 +1411,12 @@ class CourseSerializer(TaggitSerializer, MinimalCourseSerializer):
                 instance.facts.add(fact_obj)
 
     def update_certificate_info(self, instance, certificate_info_data):
-
         if instance.certificate_info:
-            CertificateInfo.objects.filter(id=instance.certificate_info.id).update(**certificate_info_data)
+            return update_instance(instance.certificate_info, certificate_info_data, True)
         else:
             instance.certificate_info = CertificateInfo.objects.create(**certificate_info_data)
             instance.save()
+            return instance.certificate_info, False
 
     def update_product_meta(self, instance, product_meta_data):
         """ Updates product metadata (inside additional metadata) for a course. """
@@ -1436,12 +1437,14 @@ class CourseSerializer(TaggitSerializer, MinimalCourseSerializer):
 
     def update_additional_metadata(self, instance, additional_metadata):
 
+        changed = False
         facts = additional_metadata.pop('facts', None)
         certificate_info = additional_metadata.pop('certificate_info', None)
         product_meta = additional_metadata.pop('product_meta', None)
 
         if instance.additional_metadata:
-            AdditionalMetadata.objects.filter(id=instance.additional_metadata.id).update(**additional_metadata)
+            _, additional_metadata_changed = update_instance(instance.additional_metadata, additional_metadata, True)
+            changed = changed or additional_metadata_changed
         else:
             instance.additional_metadata = AdditionalMetadata.objects.create(**additional_metadata)
 
@@ -1452,8 +1455,11 @@ class CourseSerializer(TaggitSerializer, MinimalCourseSerializer):
             self.update_product_meta(instance.additional_metadata, product_meta)
 
         if certificate_info:
-            self.update_certificate_info(instance.additional_metadata, certificate_info)
+            _, certification_info_changed = self.update_certificate_info(instance.additional_metadata, certificate_info)
+            changed = changed or certification_info_changed
 
+        if changed:
+            instance.refresh_from_db(fields=('data_modified_timestamp',))
         # save() will be called by main update()
 
     def update_geolocation(self, instance, geolocation):
@@ -1492,7 +1498,7 @@ class CourseSerializer(TaggitSerializer, MinimalCourseSerializer):
     def update(self, instance, validated_data):
         # Handle writing nested fields separately
         if 'additional_metadata' in validated_data:
-            # Handle additional metadata only for 2U courses else just pop
+            # Handle additional metadata only for external courses else just pop
             additional_metadata_data = validated_data.pop('additional_metadata')
             if instance.is_external_course:
                 self.update_additional_metadata(instance, additional_metadata_data)

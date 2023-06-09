@@ -1120,6 +1120,7 @@ class CourseViewSetTests(SerializationMixin, ElasticsearchTestMixin, OAuth2Mixin
         course = CourseFactory(additional_metadata=None, type=type_2U)
         current = datetime.datetime.now(pytz.UTC)
         future = current + datetime.timedelta(days=10)
+        previous_data_modified_timestamp = course.data_modified_timestamp
 
         additional_metadata = {
             'external_url': 'https://example.com/',
@@ -1154,6 +1155,9 @@ class CourseViewSetTests(SerializationMixin, ElasticsearchTestMixin, OAuth2Mixin
         course = Course.everything.get(uuid=course.uuid, draft=True)
         self.assertDictEqual(self.serialize_course(course)['additional_metadata'], additional_metadata)
 
+        assert previous_data_modified_timestamp < course.data_modified_timestamp
+        previous_data_modified_timestamp = course.data_modified_timestamp
+
         # test if object update on same course is successful
         new_facts = [
             {
@@ -1164,17 +1168,11 @@ class CourseViewSetTests(SerializationMixin, ElasticsearchTestMixin, OAuth2Mixin
                 'heading': 'New Fact heading 333',
                 'blurb': '<p>New Fact blurb 2</p>',
             }
-
         ]
-        new_cert = {
-            'heading': 'New Certificate heading',
-            'blurb': '<p>New Certificate blurb</p>',
-        }
         course_data = {
             'additional_metadata': {
                 'external_identifier': '67890',  # change external_identifier
                 'facts': new_facts,
-                'certificate_info': new_cert,
             }
         }
         response = self.client.patch(url, course_data, format='json')
@@ -1183,8 +1181,26 @@ class CourseViewSetTests(SerializationMixin, ElasticsearchTestMixin, OAuth2Mixin
 
         additional_metadata['external_identifier'] = '67890'  # to make sure that the value is updated
         additional_metadata['facts'] = new_facts
+        self.assertDictEqual(self.serialize_course(course)['additional_metadata'], additional_metadata)
+        assert previous_data_modified_timestamp < course.data_modified_timestamp
+        previous_data_modified_timestamp = course.data_modified_timestamp
+
+        new_cert = {
+            'heading': 'New Certificate heading',
+            'blurb': '<p>New Certificate blurb</p>',
+        }
+        course_data = {
+            'additional_metadata': {
+                'certificate_info': new_cert,
+            }
+        }
+        response = self.client.patch(url, course_data, format='json')
+        assert response.status_code == 200
+        course = Course.everything.get(uuid=course.uuid, draft=True)
+
         additional_metadata['certificate_info'] = new_cert
         self.assertDictEqual(self.serialize_course(course)['additional_metadata'], additional_metadata)
+        assert previous_data_modified_timestamp < course.data_modified_timestamp
 
     @ddt.data(CourseType.VERIFIED_AUDIT, CourseType.PROFESSIONAL)
     @responses.activate
