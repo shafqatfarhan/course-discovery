@@ -44,8 +44,8 @@ from course_discovery.apps.course_metadata.signals import (
 )
 from course_discovery.apps.course_metadata.tests import factories
 from course_discovery.apps.course_metadata.tests.factories import (
-    AdditionalMetadataFactory, CourseFactory, CourseRunFactory, ImageFactory, ProgramFactory, SeatFactory,
-    SeatTypeFactory, SourceFactory
+    AdditionalMetadataFactory, CourseFactory, CourseRunFactory, ImageFactory, PartnerFactory,
+    ProgramFactory, SeatFactory, SeatTypeFactory, SourceFactory
 )
 from course_discovery.apps.course_metadata.tests.mixins import MarketingSitePublisherTestMixin
 from course_discovery.apps.course_metadata.utils import ensure_draft_world
@@ -89,6 +89,40 @@ class TestCourse(TestCase):
 
         course.image = None
         assert course.image_url == course.card_image_url
+
+    def test_marketing_url_with_old_url_slug(self):
+        """
+        Verify marketing_url property returns the correct URL for a course with old url slug format.
+        """
+        marketing_site_url_root = 'https://www.example.com'
+        partner = PartnerFactory(marketing_site_url_root=marketing_site_url_root)
+        verified_and_audit_type = CourseRunType.objects.get(slug='verified-audit', is_marketable=True)
+        course = factories.CourseFactory(partner=partner)
+        _ = CourseRunFactory(
+            status='published',
+            course=course,
+            type=verified_and_audit_type
+        )
+        assert course.marketing_url == f'{marketing_site_url_root}/course/{course.active_url_slug}'
+
+    def test_marketing_url_with_updated_url_slug(self):
+        """
+        Verify marketing_url property returns the updated URL format for OCM courses with updated URL slugs.
+
+        Example: https://www.example.com/learn/primay-subject/organization-title-course-title
+        """
+        marketing_site_url_root = 'https://www.example.com'
+        partner = PartnerFactory(marketing_site_url_root=marketing_site_url_root)
+        verified_and_audit_type = CourseRunType.objects.get(slug='verified-audit', is_marketable=True)
+        source = SourceFactory(slug='edx')
+        course = factories.CourseFactory(partner=partner, product_source=source, additional_metadata=None)
+        _ = CourseRunFactory(
+            status='published',
+            course=course,
+            type=verified_and_audit_type
+        )
+        course.set_active_url_slug('learn/primary-subject/organization-title-course-title')
+        assert course.marketing_url == f'{marketing_site_url_root}/{course.active_url_slug}'
 
     def test_data_modified_timestamp_model_field_change(self):
         """

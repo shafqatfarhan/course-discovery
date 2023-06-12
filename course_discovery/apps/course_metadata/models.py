@@ -1462,7 +1462,7 @@ class Course(DraftModelMixin, PkSearchableMixin, CachedMixin, TimeStampedModel):
     def marketing_url(self):
         url = None
         if self.partner.marketing_site_url_root:
-            path = f'course/{self.active_url_slug}'
+            path = self.get_course_marketing_url_path()
             url = urljoin(self.partner.marketing_site_url_root, path)
 
         return url
@@ -1477,6 +1477,14 @@ class Course(DraftModelMixin, PkSearchableMixin, CachedMixin, TimeStampedModel):
             # current draft url slug has already been published at least once, so get it from the official course
             active_url = self.official_version.url_slug_history.filter(is_active_on_draft=True).first()
         return getattr(active_url, 'url_slug', None)
+
+    def get_course_marketing_url_path(self):
+        """
+        Returns marketing url path for course based on product source and additional metadata and active url slug
+        """
+        return self.active_url_slug if self.product_source and self.product_source.slug == 'edx' and \
+            self.additional_metadata is None and self.active_url_slug and self.active_url_slug.startswith('learn/') \
+            else f'course/{self.active_url_slug}'
 
     def course_run_sort(self, course_run):
         """
