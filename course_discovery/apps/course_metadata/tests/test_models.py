@@ -44,7 +44,7 @@ from course_discovery.apps.course_metadata.signals import (
 )
 from course_discovery.apps.course_metadata.tests import factories
 from course_discovery.apps.course_metadata.tests.factories import (
-    AdditionalMetadataFactory, CourseFactory, CourseRunFactory, ImageFactory, PartnerFactory,
+    AdditionalMetadataFactory, CourseFactory, CourseRunFactory, CourseRunTypeFactory, ImageFactory, PartnerFactory,
     ProgramFactory, SeatFactory, SeatTypeFactory, SourceFactory
 )
 from course_discovery.apps.course_metadata.tests.mixins import MarketingSitePublisherTestMixin
