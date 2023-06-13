@@ -1483,8 +1483,7 @@ class Course(DraftModelMixin, PkSearchableMixin, CachedMixin, TimeStampedModel):
         Returns marketing url path for course based on product source and additional metadata and active url slug
         """
         return self.active_url_slug if self.product_source and self.product_source.slug == 'edx' and \
-            self.additional_metadata is None and self.active_url_slug and self.active_url_slug.startswith('learn/') \
-            else f'course/{self.active_url_slug}'
+            self.active_url_slug and self.active_url_slug.find('/') != -1 else f'course/{self.active_url_slug}'
 
     def course_run_sort(self, course_run):
         """
